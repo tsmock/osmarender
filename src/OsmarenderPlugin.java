@@ -7,10 +7,12 @@ import java.util.Collection;
 import java.util.HashSet;
 
 import javax.swing.AbstractAction;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JTextField;
 
 import org.openstreetmap.josm.Main;
 import org.openstreetmap.josm.data.Bounds;
@@ -21,8 +23,11 @@ import org.openstreetmap.josm.data.osm.Segment;
 import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.osm.visitor.AddVisitor;
 import org.openstreetmap.josm.gui.MapFrame;
+import org.openstreetmap.josm.gui.preferences.PreferenceDialog;
+import org.openstreetmap.josm.gui.preferences.PreferenceSetting;
 import org.openstreetmap.josm.io.OsmWriter;
 import org.openstreetmap.josm.plugins.Plugin;
+import org.openstreetmap.josm.tools.GBC;
 
 
 public class OsmarenderPlugin extends Plugin {
@@ -64,31 +69,22 @@ public class OsmarenderPlugin extends Plugin {
             }
 
             String firefox = Main.pref.get("osmarender.firefox", "firefox");
-            boolean retry = false;
-            do {
-                try {
-                    retry = false;
+            try {
+                // write to plugin dir
+                OsmWriter.output(new FileOutputStream(getPluginDir()+"data.osm"), new OsmWriter.All(fromDataSet, true));
 
-                    // write to plugin dir
-                    OsmWriter.output(new FileOutputStream(getPluginDir()+"data.osm"), new OsmWriter.All(fromDataSet, true));
+                // get the exec line
+                String exec = firefox;
+                if (System.getProperty("os.name").startsWith("Windows"))
+                    exec += " file:///"+getPluginDir().replace('\\','/').replace(" ","%20")+"osm-map-features.xml\"";
+                else
+                    exec += " "+getPluginDir()+"osm-map-features.xml";
 
-                    // get the exec line
-                    String exec = firefox;
-                    if (System.getProperty("os.name").startsWith("Windows"))
-                        exec += " file:///"+getPluginDir().replace('\\','/').replace(" ","%20")+"osm-map-features.xml\"";
-                    else
-                        exec += " "+getPluginDir()+"osm-map-features.xml";
-
-                    // launch up the viewer
-                    Runtime.getRuntime().exec(exec);
-                } catch (IOException e1) {
-                    firefox = JOptionPane.showInputDialog(Main.parent, "FireFox not found. Please enter location of firefox executable");
-                    if (firefox != null) {
-                        Main.pref.put("osmarender.firefox", firefox);
-                        retry = true;
-                    }
-                }
-            } while (retry);
+                // launch up the viewer
+                Runtime.getRuntime().exec(exec);
+            } catch (IOException e1) {
+                JOptionPane.showMessageDialog(Main.parent, tr("FireFox not found. Please set firefox executable in the preferences."));
+            }
         }
     }
 
@@ -130,5 +126,20 @@ public class OsmarenderPlugin extends Plugin {
             if (view.getMenuComponentCount() == 1)
                 view.setVisible(true);
         }
+    }
+
+    @Override public PreferenceSetting getPreferenceSetting() {
+        return new PreferenceSetting(){
+            private JTextField firefox = new JTextField(10);
+            public void addGui(PreferenceDialog gui) {
+                gui.map.add(new JLabel(tr("osmarender options")), GBC.eol().insets(0,5,0,0));
+                gui.map.add(new JLabel(tr("FireFox executable")), GBC.std().insets(10,5,5,0));
+                gui.map.add(firefox, GBC.eol().insets(0,5,0,0).fill(GBC.HORIZONTAL));
+                firefox.setText(Main.pref.get("osmarender.firefox"));
+            }
+            public void ok() {
+                Main.pref.put("osmarender.firefox", firefox.getText());
+            }
+        };
     }
 }
