@@ -3,6 +3,9 @@ import static org.openstreetmap.josm.tools.I18n.tr;
 import java.awt.event.ActionEvent;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.util.Collection;
 import java.util.HashSet;
 
@@ -29,7 +32,6 @@ import org.openstreetmap.josm.io.OsmWriter;
 import org.openstreetmap.josm.plugins.Plugin;
 import org.openstreetmap.josm.tools.GBC;
 
-
 public class OsmarenderPlugin extends Plugin {
 
     private class Action extends AbstractAction {
@@ -43,8 +45,14 @@ public class OsmarenderPlugin extends Plugin {
             LatLon bottomLeft = Main.map.mapView.getLatLon(0,Main.map.mapView.getHeight());
             LatLon topRight = Main.map.mapView.getLatLon(Main.map.mapView.getWidth(), 0);
             Bounds b = new Bounds(bottomLeft, topRight);
-            CollectBackReferencesVisitor backRefsV =
-                new CollectBackReferencesVisitor(Main.ds, true);
+
+            try {
+                writeGenerated(b);
+            } catch(Exception ex) {
+                //how handle the exception?
+            }
+
+            CollectBackReferencesVisitor backRefsV = new CollectBackReferencesVisitor(Main.ds, true);
             DataSet fromDataSet = new DataSet();
             for (Node n : Main.ds.nodes) {
                 if (n.deleted || n.incomplete) continue;
@@ -69,9 +77,9 @@ public class OsmarenderPlugin extends Plugin {
                 // get the exec line
                 String exec = firefox;
                 if (System.getProperty("os.name").startsWith("Windows"))
-                    exec += " file:///"+getPluginDir().replace('\\','/').replace(" ","%20")+"osm-map-features.xml\"";
+                    exec += " file:///"+getPluginDir().replace('\\','/').replace(" ","%20")+"generated.xml\"";
                 else
-                    exec += " "+getPluginDir()+"osm-map-features.xml";
+                    exec += " "+getPluginDir()+"generated.xml";
 
                 // launch up the viewer
                 Runtime.getRuntime().exec(exec);
@@ -134,5 +142,36 @@ public class OsmarenderPlugin extends Plugin {
                 Main.pref.put("osmarender.firefox", firefox.getText());
             }
         };
+    }
+
+    private void writeGenerated(Bounds b) throws IOException {
+        String bounds_tag = "<bounds " +
+            "minlat=\"" + b.min.lat() + "\" " +
+            "maxlat=\"" + b.max.lat() + "\" " +
+            "minlon=\"" + b.min.lon() + "\" " +
+            "maxlon=\"" + b.max.lon() + "\" " + "/>";
+
+        BufferedReader reader = new BufferedReader(
+                new FileReader( getPluginDir() + "osm-map-features.xml") );
+        PrintWriter writer = new PrintWriter( getPluginDir() + "generated.xml");
+
+        // osm-map-fetaures.xml contain two placemark
+        // (bounds_mkr1 and bounds_mkr2). We write the bounds tag
+        // between the two
+        String str = null;
+        while( (str = reader.readLine()) != null ) {
+            if(str.contains("<!--bounds_mkr1-->")) {
+                writer.println(str);
+                writer.println("    " + bounds_tag);
+                while(!str.contains("<!--bounds_mkr2-->")) {
+                    str = reader.readLine();
+                }
+                writer.println(str);
+            } else {
+                writer.println(str);
+            }
+        }
+
+        writer.close();
     }
 }
