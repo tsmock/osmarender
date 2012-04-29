@@ -46,9 +46,10 @@ public class OsmarenderPlugin extends Plugin {
     private class Action extends JosmAction {
 
         public Action() {
-            super(tr("Osmarender"), null, tr("Osmarender"), null, true, "osmarender", true);
+            super(tr("Osmarender"), (String)null, tr("Osmarender"), null, true, "osmarender", true);
         }
 
+        @Override
         public void actionPerformed(ActionEvent e) {
             // get all stuff visible on screen
             LatLon bottomLeft = Main.map.mapView.getLatLon(0,Main.map.mapView.getHeight());
